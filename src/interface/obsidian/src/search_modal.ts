@@ -3,167 +3,167 @@ import { KhojSetting } from 'src/settings';
 import { createNoteAndCloseModal } from 'src/utils';
 
 export interface SearchResult {
-    entry: string;
-    file: string;
+	entry: string;
+	file: string;
 }
 
 export class KhojSearchModal extends SuggestModal<SearchResult> {
-    setting: KhojSetting;
-    rerank: boolean = false;
-    find_similar_notes: boolean;
-    query: string = "";
-    app: App;
+	setting: KhojSetting;
+	rerank = false;
+	find_similar_notes: boolean;
+	query = "";
+	app: App;
 
-    constructor(app: App, setting: KhojSetting, find_similar_notes: boolean = false) {
-        super(app);
-        this.app = app;
-        this.setting = setting;
-        this.find_similar_notes = find_similar_notes;
+	constructor(app: App, setting: KhojSetting, find_similar_notes = false) {
+		super(app);
+		this.app = app;
+		this.setting = setting;
+		this.find_similar_notes = find_similar_notes;
 
-        // Hide input element in Similar Notes mode
-        this.inputEl.hidden = this.find_similar_notes;
+		// Hide input element in Similar Notes mode
+		this.inputEl.hidden = this.find_similar_notes;
 
-        // Register Modal Keybindings to Rerank Results
-        this.scope.register(['Mod'], 'Enter', async () => {
-            // Re-rank when explicitly triggered by user
-            this.rerank = true
-            // Trigger input event to get and render (reranked) results from khoj backend
-            this.inputEl.dispatchEvent(new Event('input'));
-            // Rerank disabled by default to satisfy latency requirements for incremental search
-            this.rerank = false
-        });
+		// Register Modal Keybindings to Rerank Results
+		this.scope.register(['Mod'], 'Enter', async () => {
+			// Re-rank when explicitly triggered by user
+			this.rerank = true
+			// Trigger input event to get and render (reranked) results from khoj backend
+			this.inputEl.dispatchEvent(new Event('input'));
+			// Rerank disabled by default to satisfy latency requirements for incremental search
+			this.rerank = false
+		});
 
-        // Register Modal Keybindings to Create New Note with Query as Title
-        this.scope.register(['Shift'], 'Enter', async () => {
-            if (this.query != "") createNoteAndCloseModal(this.query, this);
-        });
-        this.scope.register(['Ctrl', 'Shift'], 'Enter', async () => {
-            if (this.query != "") createNoteAndCloseModal(this.query, this, { newLeaf: true });
-        });
+		// Register Modal Keybindings to Create New Note with Query as Title
+		this.scope.register(['Shift'], 'Enter', async () => {
+			if (this.query != "") createNoteAndCloseModal(this.query, this);
+		});
+		this.scope.register(['Ctrl', 'Shift'], 'Enter', async () => {
+			if (this.query != "") createNoteAndCloseModal(this.query, this, { newLeaf: true });
+		});
 
-        // Add Hints to Modal for available Keybindings
-        const modalInstructions: Instruction[] = [
-            {
-                command: '↑↓',
-                purpose: 'to navigate',
-            },
-            {
-                command: '↵',
-                purpose: 'to open',
-            },
-            {
-                command: Platform.isMacOS ? 'cmd ↵' : 'ctrl ↵',
-                purpose: 'to rerank',
-            },
-            {
-                command: 'esc',
-                purpose: 'to dismiss',
-            },
-        ]
-        this.setInstructions(modalInstructions);
+		// Add Hints to Modal for available Keybindings
+		const modalInstructions: Instruction[] = [
+			{
+				command: '↑↓',
+				purpose: 'to navigate',
+			},
+			{
+				command: '↵',
+				purpose: 'to open',
+			},
+			{
+				command: Platform.isMacOS ? 'cmd ↵' : 'ctrl ↵',
+				purpose: 'to rerank',
+			},
+			{
+				command: 'esc',
+				purpose: 'to dismiss',
+			},
+		]
+		this.setInstructions(modalInstructions);
 
-        // Set Placeholder Text for Modal
-        this.setPlaceholder('Search with Khoj...');
-    }
+		// Set Placeholder Text for Modal
+		this.setPlaceholder('Search with Khoj...');
+	}
 
-    async onOpen() {
-        if (this.find_similar_notes) {
-            // If markdown file is currently active
-            let file = this.app.workspace.getActiveFile();
-            if (file && file.extension === 'md') {
-                // Enable rerank of search results
-                this.rerank = true
-                // Set input element to contents of active markdown file
-                // truncate to first 8,000 characters to avoid hitting query size limits
-                this.inputEl.value = await this.app.vault.read(file).then(file_str => file_str.slice(0, 42110));
-                // Trigger search to get and render similar notes from khoj backend
-                this.inputEl.dispatchEvent(new Event('input'));
-                this.rerank = false
-            }
-            else {
-                this.resultContainerEl.setText('Cannot find similar notes for non-markdown files');
-            }
-        }
-    }
+	async onOpen() {
+		if (this.find_similar_notes) {
+			// If markdown file is currently active
+			const file = this.app.workspace.getActiveFile();
+			if (file && file.extension === 'md') {
+				// Enable rerank of search results
+				this.rerank = true
+				// Set input element to contents of active markdown file
+				// truncate to first 8,000 characters to avoid hitting query size limits
+				this.inputEl.value = await this.app.vault.read(file).then(file_str => file_str.slice(0, 42110));
+				// Trigger search to get and render similar notes from khoj backend
+				this.inputEl.dispatchEvent(new Event('input'));
+				this.rerank = false
+			}
+			else {
+				this.resultContainerEl.setText('Cannot find similar notes for non-markdown files');
+			}
+		}
+	}
 
-    async getSuggestions(query: string): Promise<SearchResult[]> {
-        // Query Khoj backend for search results
-        let encodedQuery = encodeURIComponent(query);
-        let searchUrl = `${this.setting.khojUrl}/api/search?q=${encodedQuery}&n=${this.setting.resultsCount}&r=${this.rerank}&client=obsidian`;
+	async getSuggestions(query: string): Promise<SearchResult[]> {
+		// Query Khoj backend for search results
+		const encodedQuery = encodeURIComponent(query);
+		const searchUrl = `${this.setting.khojUrl}/api/search?q=${encodedQuery}&n=${this.setting.resultsCount}&r=${this.rerank}&client=obsidian`;
 
-        // Get search results for markdown and pdf files
-        let mdResponse = await request(`${searchUrl}&t=markdown`);
-        let pdfResponse = await request(`${searchUrl}&t=pdf`);
+		// Get search results for markdown and pdf files
+		const mdResponse = await request(`${searchUrl}&t=markdown`);
+		const pdfResponse = await request(`${searchUrl}&t=pdf`);
 
-        // Parse search results
-        let mdData = JSON.parse(mdResponse)
-            .filter((result: any) => !this.find_similar_notes || !result.additional.file.endsWith(this.app.workspace.getActiveFile()?.path))
-            .map((result: any) => { return { entry: result.entry, score: result.score, file: result.additional.file }; });
-        let pdfData = JSON.parse(pdfResponse)
-            .filter((result: any) => !this.find_similar_notes || !result.additional.file.endsWith(this.app.workspace.getActiveFile()?.path))
-            .map((result: any) => { return { entry: `## ${result.additional.compiled}`, score: result.score, file: result.additional.file } as SearchResult; })
+		// Parse search results
+		const mdData = JSON.parse(mdResponse)
+			.filter((result: any) => !this.find_similar_notes || !result.additional.file.endsWith(this.app.workspace.getActiveFile()?.path))
+			.map((result: any) => { return { entry: result.entry, score: result.score, file: result.additional.file }; });
+		const pdfData = JSON.parse(pdfResponse)
+			.filter((result: any) => !this.find_similar_notes || !result.additional.file.endsWith(this.app.workspace.getActiveFile()?.path))
+			.map((result: any) => { return { entry: `## ${result.additional.compiled}`, score: result.score, file: result.additional.file } as SearchResult; })
 
-        // Combine markdown and PDF results and sort them by score
-        let results = mdData.concat(pdfData)
-            .sort((a: any, b: any) => b.score - a.score)
-            .map((result: any) => { return { entry: result.entry, file: result.file } as SearchResult; })
+		// Combine markdown and PDF results and sort them by score
+		const results = mdData.concat(pdfData)
+			.sort((a: any, b: any) => b.score - a.score)
+			.map((result: any) => { return { entry: result.entry, file: result.file } as SearchResult; })
 
-        this.query = query;
-        return results;
-    }
+		this.query = query;
+		return results;
+	}
 
-    async renderSuggestion(result: SearchResult, el: HTMLElement) {
-        // Max number of lines to render
-        let lines_to_render = 8;
+	async renderSuggestion(result: SearchResult, el: HTMLElement) {
+		// Max number of lines to render
+		const lines_to_render = 8;
 
-        // Extract filename of result
-        let os_path_separator = result.file.includes('\\') ? '\\' : '/';
-        let filename = result.file.split(os_path_separator).pop();
+		// Extract filename of result
+		const os_path_separator = result.file.includes('\\') ? '\\' : '/';
+		const filename = result.file.split(os_path_separator).pop();
 
-        // Remove YAML frontmatter when rendering string
-        result.entry = result.entry.replace(/---[\n\r][\s\S]*---[\n\r]/, '');
+		// Remove YAML frontmatter when rendering string
+		result.entry = result.entry.replace(/---[\n\r][\s\S]*---[\n\r]/, '');
 
-        // Truncate search results to lines_to_render
-        let entry_snipped_indicator = result.entry.split('\n').length > lines_to_render ? ' **...**' : '';
-        let snipped_entry = result.entry.split('\n').slice(0, lines_to_render).join('\n');
+		// Truncate search results to lines_to_render
+		const entry_snipped_indicator = result.entry.split('\n').length > lines_to_render ? ' **...**' : '';
+		const snipped_entry = result.entry.split('\n').slice(0, lines_to_render).join('\n');
 
-        // Show reindex hint on first search result
-        if (this.resultContainerEl.children.length == 1) {
-            let infoHintEl = createEl("div",{ cls: 'khoj-info-hint' });
-            el.insertAdjacentElement("beforebegin", infoHintEl);
-            setTimeout(() => {
-                infoHintEl.setText('Unexpected results? Try re-index your vault from the Khoj plugin settings to fix it.');
-            }, 3000);
-        }
+		// Show reindex hint on first search result
+		if (this.resultContainerEl.children.length == 1) {
+			const infoHintEl = createEl("div", { cls: 'khoj-info-hint' });
+			el.insertAdjacentElement("beforebegin", infoHintEl);
+			setTimeout(() => {
+				infoHintEl.setText('Unexpected results? Try re-index your vault from the Khoj plugin settings to fix it.');
+			}, 3000);
+		}
 
-        // Show filename of each search result for context
-        el.createEl("div",{ cls: 'khoj-result-file' }).setText(filename ?? "");
-        let result_el = el.createEl("div", { cls: 'khoj-result-entry' })
+		// Show filename of each search result for context
+		el.createEl("div", { cls: 'khoj-result-file' }).setText(filename ?? "");
+		const result_el = el.createEl("div", { cls: 'khoj-result-entry' })
 
-        // @ts-ignore
-        MarkdownRenderer.renderMarkdown(snipped_entry + entry_snipped_indicator, result_el, null, null);
-    }
+		// @ts-ignore
+		MarkdownRenderer.renderMarkdown(snipped_entry + entry_snipped_indicator, result_el, null, null);
+	}
 
-    async onChooseSuggestion(result: SearchResult, _: MouseEvent | KeyboardEvent) {
-        // Get all markdown and PDF files in vault
-        const mdFiles = this.app.vault.getMarkdownFiles();
-        const pdfFiles = this.app.vault.getFiles().filter(file => file.extension === 'pdf');
+	async onChooseSuggestion(result: SearchResult, _: MouseEvent | KeyboardEvent) {
+		// Get all markdown and PDF files in vault
+		const mdFiles = this.app.vault.getMarkdownFiles();
+		const pdfFiles = this.app.vault.getFiles().filter(file => file.extension === 'pdf');
 
-        // Find the vault file matching file of chosen search result
-        let file_match = mdFiles.concat(pdfFiles)
-            // Sort by descending length of path
-            // This finds longest path match when multiple files have same name
-            .sort((a, b) => b.path.length - a.path.length)
-            // The first match is the best file match across OS
-            // e.g Khoj server on Linux, Obsidian vault on Android
-            .find(file => result.file.replace(/\\/g, "/").endsWith(file.path))
+		// Find the vault file matching file of chosen search result
+		const file_match = mdFiles.concat(pdfFiles)
+			// Sort by descending length of path
+			// This finds longest path match when multiple files have same name
+			.sort((a, b) => b.path.length - a.path.length)
+			// The first match is the best file match across OS
+			// e.g Khoj server on Linux, Obsidian vault on Android
+			.find(file => result.file.replace(/\\/g, "/").endsWith(file.path))
 
-        // Open vault file at heading of chosen search result
-        if (file_match) {
-            let resultHeading = file_match.extension !== 'pdf' ? result.entry.split('\n', 1)[0] : '';
-            let linkToEntry = resultHeading.startsWith('#') ? `${file_match.path}${resultHeading}` : file_match.path;
-            this.app.workspace.openLinkText(linkToEntry, '');
-            console.log(`Link: ${linkToEntry}, File: ${file_match.path}, Heading: ${resultHeading}`);
-        }
-    }
+		// Open vault file at heading of chosen search result
+		if (file_match) {
+			const resultHeading = file_match.extension !== 'pdf' ? result.entry.split('\n', 1)[0] : '';
+			const linkToEntry = resultHeading.startsWith('#') ? `${file_match.path}${resultHeading}` : file_match.path;
+			this.app.workspace.openLinkText(linkToEntry, '');
+			console.log(`Link: ${linkToEntry}, File: ${file_match.path}, Heading: ${resultHeading}`);
+		}
+	}
 }

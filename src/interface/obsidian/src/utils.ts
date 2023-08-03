@@ -22,7 +22,7 @@ interface ProcessorData {
 	};
 }
 
-export async function configureKhojBackend(vault: Vault, setting: KhojSetting, notify= true) {
+export async function configureKhojBackend(vault: Vault, setting: KhojSetting, notify = true) {
 	const vaultPath = getVaultAbsolutePath(vault);
 	const mdInVault = `${vaultPath}/**/*.md`;
 	const pdfInVault = `${vaultPath}/**/*.pdf`;
@@ -156,7 +156,7 @@ export async function configureKhojBackend(vault: Vault, setting: KhojSetting, n
 			}
 
 			// If the Open AI API Key was configured in the plugin settings
-			if (!!setting.openaiApiKey) {
+			if (setting.openaiApiKey) {
 
 				const openAIChatModel = data?.["processor"]?.["conversation"]?.["openai"]?.["chat-model"] ?? khojDefaultChatModelName;
 
@@ -188,6 +188,7 @@ export async function configureKhojBackend(vault: Vault, setting: KhojSetting, n
 		})
 }
 
+// eslint-disable-next-line @typescript-eslint/ban-types
 export async function updateKhojBackend(khojUrl: string, khojConfig: Object) {
 	// POST khojConfig to khojConfigUrl
 	const requestContent: RequestUrlParam = {
